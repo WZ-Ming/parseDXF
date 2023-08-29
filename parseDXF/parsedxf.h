@@ -1,4 +1,4 @@
-#ifndef PARSEDXF_H
+﻿#ifndef PARSEDXF_H
 #define PARSEDXF_H
 
 #include <QMainWindow>
@@ -12,6 +12,7 @@
 #include <QVector>
 #include <qmap.h>
 #include <QDebug>
+#include<QGraphicsWidget>
 #include <QFileDialog>
 #include <QGraphicsPathItem>
 #include <QtGlobal>
@@ -58,6 +59,7 @@ private slots:
 
     void refreshView();
     void showSortPath();
+    void outputShape();
 
 public slots:
     void updateProgress(const int value, const bool iscompleted);
@@ -99,6 +101,9 @@ private:
     QVector<int> listClickedVector;
 
     const double Cpoint_dis = 5, CaxisLength = 50;
+
+signals:
+    void outputWorkPoints(QSharedPointer<QVector<shapeMsg>>);
 
 };
 

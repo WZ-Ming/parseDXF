@@ -10,7 +10,8 @@
 //排序存储结构体
 struct shapeMsg
 {
-    QPointF endPoint[2]={QPointF(0,0),QPointF(0,0)};
+    QString graphicType;
+    QVector<QPointF> pointVector;
     bool needAirMove = true;
     int shapePos;
     bool isTurnDir = false;

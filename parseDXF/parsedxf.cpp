@@ -1,4 +1,4 @@
-#include "parsedxf.h"
+﻿#include "parsedxf.h"
 #include "ui_parsedxf.h"
 
 parseDXF::parseDXF(QWidget *parent) :
@@ -22,6 +22,7 @@ parseDXF::parseDXF(QWidget *parent) :
     pen.setWidth(0);
     initAxisItem();
     drawCenterAxis();
+
     ui->graphicsView->setScene(scene);
     layShapeCombo = new QMutiCheckBox(this);
     layShapeCombo->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -107,8 +108,10 @@ void parseDXF::mousePressEvent(QMouseEvent *event)
         QMenu subMenu;
         QAction act_refresh("刷新", this);
         QAction act_drawPath("路径", this);
+        QAction act_output("导出", this);
         menu.addAction(&act_refresh);
         menu.addAction(&act_drawPath);
+        menu.addAction(&act_output);
         menu.addMenu(&subMenu);
         subMenu.setTitle("排序");
         QAction act_pointSort("起始原点排序", this);
@@ -119,6 +122,7 @@ void parseDXF::mousePressEvent(QMouseEvent *event)
         subMenu.addAction(&act_handSort);
         connect(&act_refresh, &QAction::triggered, this, &parseDXF::refreshView);
         connect(&act_drawPath, &QAction::triggered, this, &parseDXF::showSortPath);
+        connect(&act_output, &QAction::triggered, this, &parseDXF::outputShape);
         connect(&act_pointSort, &QAction::triggered, [this](){
             sortShape(sortTask->pointSort);
         });
@@ -263,8 +267,8 @@ void parseDXF::openDXF()
                     progressshow->update();
                 }
                 if (sLine == "ENTITIES"){
-                    QString layPosTmp;
                     QVector<double>vector(8);
+                    QString layPosTmp;
                     while (sLine != "ENDSEC"){
                         if (sLine == "LINE"){
                             sLine = aStream.readLine().trimmed();
@@ -280,7 +284,7 @@ void parseDXF::openDXF()
                                 }
                                 sLine = aStream.readLine().trimmed();
                             }
-                            sortTask->allShapeVector.append(vector.mid(0,5));
+                            sortTask->allShapeVector.append(vector);
                             layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                         }
                         else if (sLine == "ELLIPSE"){
@@ -343,7 +347,6 @@ void parseDXF::openDXF()
                                                 vector[1] = x;
                                                 vector[2] = y;
                                                 vector[3] = r;
-                                                sortTask->allShapeVector.append(vector.mid(0,4));
                                             }
                                             else{
                                                 double angle_0, angle_1;
@@ -389,7 +392,6 @@ void parseDXF::openDXF()
                                                 vector[3] = r;
                                                 vector[4] = angle_0;
                                                 vector[5] = angle_1;
-                                                sortTask->allShapeVector.append(vector.mid(0,6));
                                             }
                                         }
                                         else{
@@ -398,8 +400,8 @@ void parseDXF::openDXF()
                                             vector[2] = y0;
                                             vector[3] = x1;
                                             vector[4] = y1;
-                                            sortTask->allShapeVector.append(vector.mid(0,5));
                                         }
+                                        sortTask->allShapeVector.append(vector);
                                         layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                                         x0 = x1;
                                         y0 = y1;
@@ -426,7 +428,6 @@ void parseDXF::openDXF()
                                         vector[1] = x;
                                         vector[2] = y;
                                         vector[3] = r;
-                                        sortTask->allShapeVector.append(vector.mid(0,4));
                                     }
                                     else{
                                         double angle_0, angle_1;
@@ -466,23 +467,24 @@ void parseDXF::openDXF()
                                                     angle_0 = 360 + angle_0;
                                             }
                                         }
+                                        if (vector.capacity()>vector.size()) vector.squeeze();
                                         vector[0] = sortTask->arc;
                                         vector[1] = x;
                                         vector[2] = y;
                                         vector[3] = r;
                                         vector[4] = angle_0;
                                         vector[5] = angle_1;
-                                        sortTask->allShapeVector.append(vector.mid(0,6));
                                     }
                                 }
                                 else{
+                                    if (vector.capacity()>vector.size()) vector.squeeze();
                                     vector[0] = sortTask->line;
                                     vector[1] = x0;
                                     vector[2] = y0;
                                     vector[3] = x1;
                                     vector[4] = y1;
-                                    sortTask->allShapeVector.append(vector.mid(0,5));
                                 }
+                                sortTask->allShapeVector.append(vector);
                                 layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                             }
                         }
@@ -501,7 +503,7 @@ void parseDXF::openDXF()
                                 }
                                 sLine = aStream.readLine().trimmed();
                             }
-                            sortTask->allShapeVector.append(vector.mid(0,6));
+                            sortTask->allShapeVector.append(vector);
                             layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                         }
                         else if (sLine == "CIRCLE"){
@@ -517,7 +519,7 @@ void parseDXF::openDXF()
                                 }
                                 sLine = aStream.readLine().trimmed();
                             }
-                            sortTask->allShapeVector.append(vector.mid(0,4));
+                            sortTask->allShapeVector.append(vector);
                             layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                         }
                         else if (sLine == "POINT"){
@@ -532,7 +534,7 @@ void parseDXF::openDXF()
                                 }
                                 sLine = aStream.readLine().trimmed();
                             }
-                            sortTask->allShapeVector.append(vector.mid(0,3));
+                            sortTask->allShapeVector.append(vector);
                             layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                         }
                         else if (sLine == "INSERT"){
@@ -643,10 +645,10 @@ void parseDXF::openDXF()
             }
             progressshow->updateProgressValue(75);
             afile.close();
-            ParseInsert(insertVectorMap, blockVectorMap);
-            initComBox();
             sortTask->allShapeVector.squeeze();
             sortTask->curLayShapesVector.squeeze();
+            ParseInsert(insertVectorMap, blockVectorMap);
+            initComBox();
             progressshow->updateProgressValue(100);
         }
     }
@@ -708,7 +710,7 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                         vector[3] = x + (x1 - x)*qCos(rotateAngle / 180 * M_PI) - (y1 - y)*qSin(rotateAngle / 180 * M_PI);
                         vector[4] = y + (y1 - y)*qCos(rotateAngle / 180 * M_PI) + (x1 - x)*qSin(rotateAngle / 180 * M_PI);
 
-                        sortTask->allShapeVector.append(vector.mid(0,5));
+                        sortTask->allShapeVector.append(vector);
                         layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                     }
                     else if (map_J.value() == "ELLIPSE"){
@@ -763,7 +765,7 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                         }
                         vector[1] = x + (x0 - x)*qCos(rotateAngle / 180 * M_PI) - (y0 - y)*qSin(rotateAngle / 180 * M_PI);
                         vector[2] = y + (y0 - y)*qCos(rotateAngle / 180 * M_PI) + (x0 - x)*qSin(rotateAngle / 180 * M_PI);
-                        sortTask->allShapeVector.append(vector.mid(0,3));
+                        sortTask->allShapeVector.append(vector);
                         layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                     }
                     else if (map_J.value() == "CIRCLE"){
@@ -790,7 +792,7 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                         vector[1] = x + (x0 - x)*qCos(rotateAngle / 180 * M_PI) - (y0 - y)*qSin(rotateAngle / 180 * M_PI);
                         vector[2] = y + (y0 - y)*qCos(rotateAngle / 180 * M_PI) + (x0 - x)*qSin(rotateAngle / 180 * M_PI);
                         vector[3] = r;
-                        sortTask->allShapeVector.append(vector.mid(0,4));
+                        sortTask->allShapeVector.append(vector);
                         layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                     }
                     else if (map_J.value() == "LWPOLYLINE"){
@@ -843,7 +845,6 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                             vector[1] = x;
                                             vector[2] = y;
                                             vector[3] = r;
-                                            sortTask->allShapeVector.append(vector.mid(0,4));
                                         }
                                         else{
                                             double angle_0, angle_1;
@@ -889,7 +890,6 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                             vector[3] = r;
                                             vector[4] = angle_0;
                                             vector[5] = angle_1;
-                                            sortTask->allShapeVector.append(vector.mid(0,6));
                                         }
                                     }
                                     else{
@@ -898,8 +898,8 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                         vector[2] = y0;
                                         vector[3] = x1;
                                         vector[4] = y1;
-                                        sortTask->allShapeVector.append(vector.mid(0,5));
                                     }
+                                    sortTask->allShapeVector.append(vector);
                                     layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                                     x0 = x1;
                                     y0 = y1;
@@ -929,7 +929,6 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                     vector[1] = x;
                                     vector[2] = y;
                                     vector[3] = r;
-                                    sortTask->allShapeVector.append(vector.mid(0,4));
                                 }
                                 else{
                                     double angle_0, angle_1;
@@ -975,7 +974,6 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                     vector[3] = r;
                                     vector[4] = angle_0;
                                     vector[5] = angle_1;
-                                    sortTask->allShapeVector.append(vector.mid(0,6));
                                 }
                             }
                             else{
@@ -984,8 +982,8 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                                 vector[2] = y0;
                                 vector[3] = x1;
                                 vector[4] = y1;
-                                sortTask->allShapeVector.append(vector.mid(0,5));
                             }
+                            sortTask->allShapeVector.append(vector);
                             layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                         }
                     }
@@ -1025,7 +1023,7 @@ void parseDXF::ParseInsert(QSharedPointer<QVector<QMap<int, QString>>> insertVec
                             angle_1 = angle_1 + rotateAngle;
                         vector[4] = angle_0;
                         vector[5] = angle_1;
-                        sortTask->allShapeVector.append(vector.mid(0,6));
+                        sortTask->allShapeVector.append(vector);
                         layToShapeMutiMap.insertMulti(layPosTmp, sortTask->allShapeVector.size() - 1);
                     }
                 }
@@ -1061,8 +1059,6 @@ void parseDXF::draw_scene()
 
     initAxisItem();
 
-    double minX=-10,maxX=10,minY=-10,maxY=10;
-    bool firstFor=true;
     double r0 = 0, r1 = 0, angle_0 = 0, angle_1 = 0, angle_move = 0, theta = 0;
     foreach(int i, sortTask->curLayShapesVector){
         auto shapeType = static_cast<sortShapeTask::shapeType>(static_cast<int>(sortTask->allShapeVector[i][0]));
@@ -1073,17 +1069,6 @@ void parseDXF::draw_scene()
             item->setFlag(QGraphicsItem::ItemIsSelectable, false);
             findScenItemMap.insert(i, item);
             scene->addItem(item);
-            if(firstFor){
-                firstFor=false;
-                minX=maxX=sortTask->allShapeVector[i][1];
-                minY=maxY=sortTask->allShapeVector[i][2];
-            }
-            else{
-                if(sortTask->allShapeVector[i][1]>maxX)maxX=sortTask->allShapeVector[i][1];
-                if(sortTask->allShapeVector[i][1]<minX)minX=sortTask->allShapeVector[i][1];
-                if(sortTask->allShapeVector[i][2]>maxY)maxY=sortTask->allShapeVector[i][2];
-                if(sortTask->allShapeVector[i][2]<minY)minY=sortTask->allShapeVector[i][2];
-            }
         }
         else if (shapeType == sortTask->line){
             QGraphicsLineItem *item = new QGraphicsLineItem;
@@ -1092,34 +1077,6 @@ void parseDXF::draw_scene()
             item->setFlag(QGraphicsItem::ItemIsSelectable, false);
             findScenItemMap.insert(i, item);
             scene->addItem(item);
-            if(firstFor){
-                firstFor=false;
-                if(sortTask->allShapeVector[i][1]>sortTask->allShapeVector[i][3]){
-                    minX=sortTask->allShapeVector[i][3];
-                    maxX=sortTask->allShapeVector[i][1];
-                }else{
-                    minX=sortTask->allShapeVector[i][1];
-                    maxX=sortTask->allShapeVector[i][3];
-                }
-                if(sortTask->allShapeVector[i][2]>sortTask->allShapeVector[i][4]){
-                    minY=sortTask->allShapeVector[i][4];
-                    maxY=sortTask->allShapeVector[i][2];
-                }
-                else{
-                    minY=sortTask->allShapeVector[i][2];
-                    maxY=sortTask->allShapeVector[i][4];
-                }
-            }
-            else{
-                if(sortTask->allShapeVector[i][1]>maxX)maxX=sortTask->allShapeVector[i][1];
-                if(sortTask->allShapeVector[i][1]<minX)minX=sortTask->allShapeVector[i][1];
-                if(sortTask->allShapeVector[i][2]>maxY)maxY=sortTask->allShapeVector[i][2];
-                if(sortTask->allShapeVector[i][2]<minY)minY=sortTask->allShapeVector[i][2];
-                if(sortTask->allShapeVector[i][3]>maxX)maxX=sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][3]<minX)minX=sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][4]>maxY)maxY=sortTask->allShapeVector[i][4];
-                if(sortTask->allShapeVector[i][4]<minY)minY=sortTask->allShapeVector[i][4];
-            }
         }
         else if (shapeType == sortTask->circle){
             QGraphicsEllipseItem *item = new QGraphicsEllipseItem;
@@ -1128,19 +1085,6 @@ void parseDXF::draw_scene()
             item->setFlag(QGraphicsItem::ItemIsSelectable, true);
             findScenItemMap.insert(i, item);
             scene->addItem(item);
-            if(firstFor){
-                firstFor=false;
-                minX=sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3];
-                maxX=sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3];
-                minY=sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3];
-                maxY=sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3];
-            }
-            else{
-                if(sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3]>maxX)maxX=sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3]<minX)minX=sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3]>maxY)maxY=sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3]<minY)minY=sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3];
-            }
         }
         else if (shapeType == sortTask->arc){
             QPainterPath path;
@@ -1156,19 +1100,6 @@ void parseDXF::draw_scene()
             item->setFlag(QGraphicsItem::ItemIsSelectable, true);
             findScenItemMap.insert(i, item);
             scene->addItem(item);
-            if(firstFor){
-                firstFor=false;
-                minX=sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3];
-                maxX=sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3];
-                minY=sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3];
-                maxY=sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3];
-            }
-            else{
-                if(sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3]>maxX)maxX=sortTask->allShapeVector[i][1]+sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3]<minX)minX=sortTask->allShapeVector[i][1]-sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3]>maxY)maxY=sortTask->allShapeVector[i][2]+sortTask->allShapeVector[i][3];
-                if(sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3]<minY)minY=sortTask->allShapeVector[i][2]-sortTask->allShapeVector[i][3];
-            }
         }
         else if (shapeType == sortTask->ellipse){
             r0 = qSqrt(qPow(sortTask->allShapeVector[i][3], 2) + qPow(sortTask->allShapeVector[i][4], 2));
@@ -1191,37 +1122,45 @@ void parseDXF::draw_scene()
             item->setRotation(theta);
             findScenItemMap.insert(i, item);
             scene->addItem(item);
-            if(firstFor){
-                firstFor=false;
-                minX=sortTask->allShapeVector[i][1]-r0;
-                maxX=sortTask->allShapeVector[i][1]+r0;
-                minY=sortTask->allShapeVector[i][2]-r0;
-                maxY=sortTask->allShapeVector[i][2]+r0;
-            }
-            else{
-                if(sortTask->allShapeVector[i][1]+r0>maxX)maxX=sortTask->allShapeVector[i][1]+r0;
-                if(sortTask->allShapeVector[i][1]-r0<minX)minX=sortTask->allShapeVector[i][1]-r0;
-                if(sortTask->allShapeVector[i][2]+r0>maxY)maxY=sortTask->allShapeVector[i][2]+r0;
-                if(sortTask->allShapeVector[i][2]-r0<minY)minY=sortTask->allShapeVector[i][2]-r0;
-            }
         }
     }
-    QMatrix matrix(1,0,0,1,0,0);
-    ui->graphicsView->setMatrix(matrix);
+    bool firstFor=true;
+    double minX=0,maxX=0,minY=0,maxY=0;
+    foreach(QGraphicsItem* itemTmp,scene->items()){
+        QRectF rect=itemTmp->boundingRect();
+        if(firstFor){
+            firstFor=false;
+            maxX=rect.bottomRight().x();
+            minX=rect.topLeft().x();
+            minY=rect.topLeft().y();
+            maxY=rect.bottomRight().y();
+        }
+        else{
+            if(maxX<rect.bottomRight().x()) maxX=rect.bottomRight().x();
+            if(minX>rect.topLeft().x()) minX=rect.topLeft().x();
+            if(maxY<rect.bottomRight().y()) maxY=rect.bottomRight().y();
+            if(minY>rect.topLeft().y()) minY=rect.topLeft().y();
+        }
+    }
+
+    ui->graphicsView->setMatrix(QMatrix(1,0,0,1,0,0));
     scene->setSceneRect(-0.5*ui->graphicsView->width(), -0.5*ui->graphicsView->height(), ui->graphicsView->width(), ui->graphicsView->height());
 
     double scaleXTmp=scene->sceneRect().width()/(maxX-minX),scaleYTmp=scene->sceneRect().height()/(maxY-minY);
     double scaleTmp=qMin(scaleXTmp,scaleYTmp);
-    matrix.setMatrix(ui->graphicsView->matrix().m11()*scaleTmp,ui->graphicsView->matrix().m12(),ui->graphicsView->matrix().m21(),ui->graphicsView->matrix().m22()*scaleTmp,ui->graphicsView->matrix().dx(),ui->graphicsView->matrix().dy());
-    ui->graphicsView->setMatrix(matrix);
+
+    double middleX=(minX+maxX)/2,middleY=(minY+maxY)/2;
+    ui->graphicsView->setMatrix(QMatrix(ui->graphicsView->matrix().m11()*scaleTmp,ui->graphicsView->matrix().m12(),ui->graphicsView->matrix().m21(),ui->graphicsView->matrix().m22()*scaleTmp,ui->graphicsView->matrix().dx(),ui->graphicsView->matrix().dy()));
 
     point_dis = Cpoint_dis / ui->graphicsView->matrix().m11();
     axisLength = CaxisLength / ui->graphicsView->matrix().m11();
     drawCenterAxis();
-    scene->setSceneRect(ui->graphicsView->mapToScene(ui->graphicsView->rect()).boundingRect());
 
-    double middleX=(minX+maxX)/2,middleY=(minY+maxY)/2;
-    scene->setSceneRect(scene->sceneRect().x() + middleX, scene->sceneRect().y() - middleY, scene->sceneRect().width(), scene->sceneRect().height());
+    scene->setSceneRect(ui->graphicsView->mapToScene(ui->graphicsView->rect()).boundingRect());
+    QPointF next_point = ui->graphicsView->mapToScene(QPoint(ui->graphicsView->width()/2,ui->graphicsView->height()/2));
+    QPointF last_point(middleX,middleY);
+    QPointF move_point = next_point - last_point;
+    scene->setSceneRect(scene->sceneRect().x() - move_point.x(), scene->sceneRect().y() - move_point.y(), scene->sceneRect().width(), scene->sceneRect().height());
 }
 
 void parseDXF::drawSortPath()
@@ -1261,8 +1200,8 @@ void parseDXF::drawSortPath()
             pen.setColor(Qt::red);
         else
             pen.setColor(Qt::green);
-        beginPoint=sortTask->sortedShapeMsg->at(i).endPoint[1];
-        endPoint = sortTask->sortedShapeMsg->at(i+1).endPoint[0];
+        beginPoint = sortTask->sortedShapeMsg->at(i).pointVector.last();
+        endPoint = sortTask->sortedShapeMsg->at(i+1).pointVector.first();
         x0 = beginPoint.x();
         y0 = beginPoint.y();
         x1 = endPoint.x();
@@ -1327,6 +1266,8 @@ void parseDXF::listWidgetAddShape(const int shapePos)
     shapeMsg beginPoint;
     if (sortTask->sortedShapeMsg->size() == 0){
         shapeMsg beginPoint;
+        beginPoint.pointVector.append(QPointF(0, 0));
+        beginPoint.graphicType = "sortBeginPoint";
         sortTask->sortedShapeMsg->append(beginPoint);
     }
     shapeMsg shapeMsgTmp;
@@ -1349,7 +1290,7 @@ void parseDXF::listWidgetAddShape(const int shapePos)
         sortTask->sortedShapeMsg->append(shapeMsgTmp);
         sortTask->sortedShapeMsg->move(sortTask->sortedShapeMsg->size() - 1, row + 2);
     }
-    sortTask->addHandSortMsg(*(sortTask->sortedShapeMsg->begin()+(row+2)), sortTask->sortedShapeMsg->at(row+1).endPoint[1]);
+    sortTask->addHandSortMsg(*(sortTask->sortedShapeMsg->begin()+(row+2)), sortTask->sortedShapeMsg->at(row+1).pointVector.last());
     drawArrow(row + 2);
 }
 
@@ -1558,6 +1499,28 @@ void parseDXF::showSortPath()
     }
     else
         QMessageBox::information(this, "提示", "路径已显示！");
+}
+
+void parseDXF::outputShape()
+{
+    if (sortTask->sortedShapeMsg->size() == 0){
+        QMessageBox::information(this, "提示", "没有排序，请先排序再导出!");
+        return;
+    }
+    if (!canOutput){
+        QMessageBox::information(this, "提示", "图形加工顺序已被改变，请先重新排序再导出!");
+        return;
+    }
+    int result = QMessageBox::question(this, "确认框", "是否确定导出最后一次排序结果?", QMessageBox::Yes | QMessageBox::No, QMessageBox::NoButton);
+    if (result == QMessageBox::Yes){
+        if(this->parent()!=nullptr){
+            progressshow = new progressShow(this);
+            progressshow->initProgressBar(sortTask->sortedShapeMsg->size(), "正在导出中...");
+            emit outputWorkPoints(sortTask->sortedShapeMsg);
+        }
+        else
+            QMessageBox::information(this, "提示", "无父对象，导出中断!");
+    }
 }
 
 void parseDXF::sortShape(const sortShapeTask::sortType type)

@@ -1,8 +1,8 @@
-#include "sorttask.h"
+﻿#include "sorttask.h"
 
 sortShapeTask::sortShapeTask():sortedShapeMsg(new QVector<shapeMsg>)
 {
-
+    //sortedShapeMsg.reset(new QVector<shapeMsg>);
 }
 
 void sortShapeTask::beginSortShape()
@@ -80,8 +80,10 @@ void sortShapeTask::beginSortShape()
 
 void sortShapeTask::handSelectSort()
 {
-    for (int i = 1; i < sortedShapeMsg->size(); i++)
-        addHandSortMsg(*(sortedShapeMsg->begin()+i), sortedShapeMsg->at(i-1).endPoint[1]);
+    for (int i = 1; i < sortedShapeMsg->size(); i++){
+        QPointF lastPoint = sortedShapeMsg->at(i-1).pointVector.last();
+        addHandSortMsg(*(sortedShapeMsg->begin()+i), lastPoint);
+    }
 }
 
 void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoint)
@@ -93,10 +95,12 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
     shapeMsgTmp.arrow23IsShowing = false;
     auto shapeType = static_cast<sortShapeTask::shapeType>(static_cast<int>(allShapeVector[shapeMsgTmp.shapePos][0]));
     QVector<double>vector = allShapeVector[shapeMsgTmp.shapePos];
+    shapeMsgTmp.pointVector.clear();
     bool isTurnDir = shapeMsgTmp.isTurnDir;
     double minDis = 0, x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     switch (shapeType){
     case line:{
+        shapeMsgTmp.graphicType = "line";
         if (!isTurnDir){
             minDis = qPow(vector[1] - lastPoint.x(), 2) + qPow(vector[2] - lastPoint.y(), 2);
             x0 = vector[1];
@@ -111,17 +115,19 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
             x1 = vector[1];
             y1 = vector[2];
         }
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case point:{
+        shapeMsgTmp.graphicType = "point";
         minDis = qPow(vector[1] - lastPoint.x(), 2) + qPow(vector[2] - lastPoint.y(), 2);
         x0 = vector[1];
         y0 = vector[2];
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
     }break;
     case circle:{
+        shapeMsgTmp.graphicType = "circle";
         if (qSqrt(qPow(lastPoint.x() - vector[1], 2) + qPow(lastPoint.y() - vector[2], 2)) < 0.1){
             x0 = (vector[1] + vector[3]);
             y0 = vector[2];
@@ -134,21 +140,47 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
         x1 = x0;
         y1 = y0;
         minDis = qPow(x0 - lastPoint.x(), 2) + qPow(y0 - lastPoint.y(), 2);
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+        QPointF pointTmp;
+        if (!isTurnDir){
+            pointTmp.setX((x0 - vector[1])*qCos(M_PI_4) - (y0 - vector[2])*qSin(M_PI_4) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(M_PI_4) + (x0 - vector[1])*qSin(M_PI_4) + vector[2]);
+            shapeMsgTmp.pointVector.append(pointTmp);
+
+            pointTmp.setX((x0 - vector[1])*qCos(M_PI_2) - (y0 - vector[2])*qSin(M_PI_2) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(M_PI_2) + (x0 - vector[1])*qSin(M_PI_2) + vector[2]);
+            shapeMsgTmp.pointVector.append(pointTmp);
+        }
+        else{
+            pointTmp.setX((x0 - vector[1])*qCos(-M_PI_4) - (y0 - vector[2])*qSin(-M_PI_4) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(-M_PI_4) + (x0 - vector[1])*qSin(-M_PI_4) + vector[2]);
+            shapeMsgTmp.pointVector.append(pointTmp);
+
+            pointTmp.setX((x0 - vector[1])*qCos(-M_PI_2) - (y0 - vector[2])*qSin(-M_PI_2) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(-M_PI_2) + (x0 - vector[1])*qSin(-M_PI_2) + vector[2]);
+            shapeMsgTmp.pointVector.append(pointTmp);
+        }
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case arc:{
+        shapeMsgTmp.graphicType = "arc";
         double angle_move = 0;
         if (vector[5] - vector[4] < 0)
             angle_move = vector[5] - vector[4] + 360;
         else
             angle_move = vector[5] - vector[4];
+        QPointF pointTmp;
         if (!isTurnDir){
             minDis = qPow(vector[1] + vector[3] * qCos(vector[4] * M_PI / 180) - lastPoint.x(), 2) + qPow(vector[2] + vector[3] * qSin(vector[4] * M_PI / 180) - lastPoint.y(), 2);
             x0 = vector[1] + vector[3] * qCos(vector[4] * M_PI / 180);
             y0 = vector[2] + vector[3] * qSin(vector[4] * M_PI / 180);
             x1 = vector[1] + vector[3] * qCos(vector[5] * M_PI / 180);
             y1 = vector[2] + vector[3] * qSin(vector[5] * M_PI / 180);
+
+            pointTmp.setX((x0 - vector[1])*qCos(angle_move / 2 * M_PI / 180) - (y0 - vector[2])*qSin(angle_move / 2 * M_PI / 180) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(angle_move / 2 * M_PI / 180) + (x0 - vector[1])*qSin(angle_move / 2 * M_PI / 180) + vector[2]);
         }
         else{
             minDis = qPow(vector[1] + vector[3] * qCos(vector[5] * M_PI / 180) - lastPoint.x(), 2) + qPow(vector[2] + vector[3] * qSin(vector[5] * M_PI / 180) - lastPoint.y(), 2);
@@ -156,11 +188,17 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
             y0 = vector[2] + vector[3] * qSin(vector[5] * M_PI / 180);
             x1 = vector[1] + vector[3] * qCos(vector[4] * M_PI / 180);
             y1 = vector[2] + vector[3] * qSin(vector[4] * M_PI / 180);
+
+            pointTmp.setX((x0 - vector[1])*qCos(-angle_move / 2 * M_PI / 180) - (y0 - vector[2])*qSin(-angle_move / 2 * M_PI / 180) + vector[1]);
+            pointTmp.setY((y0 - vector[2])*qCos(-angle_move / 2 * M_PI / 180) + (x0 - vector[1])*qSin(-angle_move / 2 * M_PI / 180) + vector[2]);
         }
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+        shapeMsgTmp.pointVector.append(pointTmp);
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case ellipse:{
+        shapeMsgTmp.graphicType = "ellipse";
         if (qFabs((vector[7] - vector[6]) * 180 / M_PI - 360) < doublePrecision){
             x0 = vector[1] + vector[3];
             y0 = vector[2] + vector[4];
@@ -179,8 +217,11 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
                 x1 = xTmp;
                 y1 = yTmp;
             }
-            shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-            shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+            shapeMsgTmp.pointVector.append(QPointF(vector[1], vector[2]));
+            shapeMsgTmp.pointVector.append(QPointF(qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2)), vector[5] * qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2))));
+            shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
         }
         else{
             double r = qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2));
@@ -190,7 +231,7 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
             double x01 = vector[1] + r*qCos(vector[7]);
             double y01 = vector[2] + r*qSin(vector[7]);
 
-            //double centerX = (x00 - vector[1])*qCos(M_PI_4) - (y00 - vector[2])*qSin(M_PI_4) + vector[1];
+            double centerX = (x00 - vector[1])*qCos(M_PI_4) - (y00 - vector[2])*qSin(M_PI_4) + vector[1];
             double centerY = (y00 - vector[2])*qCos(M_PI_4) + (x00 - vector[1])*qSin(M_PI_4) + vector[2];
             centerY = vector[5] * (centerY - vector[2]) + vector[2];
 
@@ -210,9 +251,13 @@ void sortShapeTask::addHandSortMsg(shapeMsg &shapeMsgTmp, const QPointF &lastPoi
                 x0 = xTmp;
                 y0 = yTmp;
             }
-            shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-            shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+            shapeMsgTmp.pointVector.append(QPointF(vector[1], vector[2]));
+            shapeMsgTmp.pointVector.append(QPointF(qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2)), vector[5] * qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2))));
+            shapeMsgTmp.pointVector.append(QPointF(centerX, centerY));
+            shapeMsgTmp.pointVector.append(QPointF(x1, y1));
         }
+        shapeMsgTmp.pointVector.squeeze();
     }break;}
     minDis = qSqrt(minDis);
     if (minDis <= doublePrecision)
@@ -228,11 +273,12 @@ double sortShapeTask::sortAlgorithm(const QPointF &startPoint, QSharedPointer<QV
     foreach(int j, curLayShapesVector)
         shapePosMap.insert(j, allShapeVector[j]);
     shapeMsg beginPoint;
-    beginPoint.endPoint[0]=beginPoint.endPoint[1]=startPoint;
+    beginPoint.pointVector.append(startPoint);
+    beginPoint.graphicType = "sortBeginPoint";
     sortedShapeMsgTmp->append(beginPoint);
     if (sorttype == shapeSort){
         shapeMsg shapeMsgForce;
-        calMinDis(shapePosMap.value(startShapePos), sortedShapeMsgTmp->last().endPoint[1], shapeMsgForce);
+        calMinDis(shapePosMap.value(startShapePos), sortedShapeMsgTmp->last().pointVector.last(), shapeMsgForce);
         shapeMsgForce.shapePos = startShapePos;
         sortedShapeMsgTmp->append(shapeMsgForce);
         shapePosMap.remove(startShapePos);
@@ -246,7 +292,7 @@ double sortShapeTask::sortAlgorithm(const QPointF &startPoint, QSharedPointer<QV
         QVector<double> vectorTmp;
         foreach(QVector<double> vector, shapePosMap.values().toVector()){
             shapeMsg shapeMsgTmp;
-            double minDisTmp = calMinDis(vector, sortedShapeMsgTmp->last().endPoint[1], shapeMsgTmp);
+            double minDisTmp = calMinDis(vector, sortedShapeMsgTmp->last().pointVector.last(), shapeMsgTmp);
             if (firstTime){
                 firstTime = false;
                 minDis = minDisTmp;
@@ -282,6 +328,7 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
     double minDis = 0, x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     switch (static_cast<shapeType>(static_cast<int>(vector[0]))){
     case line:{
+        shapeMsgTmp.graphicType = "line";
         double minDis0 = qPow(vector[1] - lastPoint.x(), 2) + qPow(vector[2] - lastPoint.y(), 2);
         double minDis1 = qPow(vector[3] - lastPoint.x(), 2) + qPow(vector[4] - lastPoint.y(), 2);
         if (minDis0 <= minDis1){
@@ -299,17 +346,19 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
             y1 = vector[2];
             isTurnDir = true;
         }
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case point:{
+        shapeMsgTmp.graphicType = "point";
         minDis = qPow(vector[1] - lastPoint.x(), 2) + qPow(vector[2] - lastPoint.y(), 2);
         x0 = vector[1];
         y0 = vector[2];
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
     }break;
     case circle:{
+        shapeMsgTmp.graphicType = "circle";
         if (qSqrt(qPow(lastPoint.x() - vector[1], 2) + qPow(lastPoint.y() - vector[2], 2)) < 0.1){
             x0 = (vector[1] + vector[3]);
             y0 = vector[2];
@@ -322,10 +371,23 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
         x1 = x0;
         y1 = y0;
         minDis = qPow(x0 - lastPoint.x(), 2) + qPow(y0 - lastPoint.y(), 2);
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+
+        QPointF pointTmp;
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+
+        pointTmp.setX((x0 - vector[1])*qCos(M_PI_4) - (y0 - vector[2])*qSin(M_PI_4) + vector[1]);
+        pointTmp.setY((y0 - vector[2])*qCos(M_PI_4) + (x0 - vector[1])*qSin(M_PI_4) + vector[2]);
+        shapeMsgTmp.pointVector.append(pointTmp);
+
+        pointTmp.setX((x0 - vector[1])*qCos(M_PI_2) - (y0 - vector[2])*qSin(M_PI_2) + vector[1]);
+        pointTmp.setY((y0 - vector[2])*qCos(M_PI_2) + (x0 - vector[1])*qSin(M_PI_2) + vector[2]);
+        shapeMsgTmp.pointVector.append(pointTmp);
+
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case arc:{
+        shapeMsgTmp.graphicType = "arc";
         double angle_move = 0;
         if (vector[5] - vector[4] < 0)
             angle_move = vector[5] - vector[4] + 360;
@@ -355,10 +417,13 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
             pointTmp.setY((y0 - vector[2])*qCos(-angle_move / 2 * M_PI / 180) + (x0 - vector[1])*qSin(-angle_move / 2 * M_PI / 180) + vector[2]);
             isTurnDir = true;
         }
-        shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-        shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+        shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+        shapeMsgTmp.pointVector.append(pointTmp);
+        shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+        shapeMsgTmp.pointVector.squeeze();
     }break;
     case ellipse:{
+        shapeMsgTmp.graphicType = "ellipse";
         if (qFabs((vector[7] - vector[6]) * 180 / M_PI - 360) < doublePrecision){
             x0 = vector[1] + vector[3];
             y0 = vector[2] + vector[4];
@@ -377,8 +442,12 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
                 x1 = xTmp;
                 y1 = yTmp;
             }
-            shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-            shapeMsgTmp.endPoint[1]=QPointF(x0, y0);
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+            shapeMsgTmp.pointVector.append(QPointF(vector[1], vector[2]));
+            shapeMsgTmp.pointVector.append(QPointF(qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2)), vector[5] * qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2))));
+            shapeMsgTmp.pointVector.append(QPointF(x1, y1));
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+
         }
         else{
             double r = qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2));
@@ -388,7 +457,7 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
             double x01 = vector[1] + r*qCos(vector[7]);
             double y01 = vector[2] + r*qSin(vector[7]);
 
-            //double centerX = (x00 - vector[1])*qCos(M_PI_4) - (y00 - vector[2])*qSin(M_PI_4) + vector[1];
+            double centerX = (x00 - vector[1])*qCos(M_PI_4) - (y00 - vector[2])*qSin(M_PI_4) + vector[1];
             double centerY = (y00 - vector[2])*qCos(M_PI_4) + (x00 - vector[1])*qSin(M_PI_4) + vector[2];
             centerY = vector[5] * (centerY - vector[2]) + vector[2];
 
@@ -413,9 +482,13 @@ double sortShapeTask::calMinDis(const QVector<double> &vector, const QPointF &la
                 y0 = yTmp;
                 isTurnDir = true;
             }
-            shapeMsgTmp.endPoint[0]=QPointF(x0, y0);
-            shapeMsgTmp.endPoint[1]=QPointF(x1, y1);
+            shapeMsgTmp.pointVector.append(QPointF(x0, y0));
+            shapeMsgTmp.pointVector.append(QPointF(vector[1], vector[2]));
+            shapeMsgTmp.pointVector.append(QPointF(qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2)), vector[5] * qSqrt(qPow(vector[3], 2) + qPow(vector[4], 2))));
+            shapeMsgTmp.pointVector.append(QPointF(centerX, centerY));
+            shapeMsgTmp.pointVector.append(QPointF(x1, y1));
         }
+        shapeMsgTmp.pointVector.squeeze();
     }break;}
     minDis = qSqrt(minDis);
     if (minDis <= doublePrecision)
